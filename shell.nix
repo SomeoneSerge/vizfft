@@ -17,6 +17,8 @@ mkShell {
     glew.dev
     libglvnd.dev
     eigen
+    rsync
   ];
-  EM_CACHE =  "${builtins.unsafeDiscardStringContext (builtins.toString ./.)}/.em_cache";
+  EM_CACHE = "${builtins.unsafeDiscardStringContext (builtins.toString ./.)}/.em_cache";
+  EM_PREBUILT_CACHE = "${emscripten}/share/emscripten/cache/";
 }

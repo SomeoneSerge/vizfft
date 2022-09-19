@@ -1,0 +1,60 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    
+jobs:
+  build-emscripten:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2.4.0
+        with:
+          submodules: recursive
+      - name: Install nix
+        uses: cachix/install-nix-action@v16
+        with:
+          # Pin just something so nix-shell doesn't give warnings
+          nix_path: "nixpkgs=https://github.com/nixos/nixpkgs/archive/7f9b6e2babf232412682c09e57ed666d8f84ac2d.tar.gz"
+          install_url: https://releases.nixos.org/nix/nix-2.5.1/install
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - name: Setup cachix
+        uses: cachix/cachix-action@v10
+        with:
+          name: pkgs
+      - name: Fetch dependencies
+        run: nix-shell shell.nix --command "echo Cache is hot!"
+      - name: Configure and Build
+        run: |
+          nix-shell --command "emcmake cmake -B build/ -S ."
+          umask 0022
+          nix-shell --command 'mkdir -p "$EM_CACHE"'
+          nix-shell --command 'rsync -ac "$EM_PREBUILT_CACHE/" "$EM_CACHE/"'
+          chmod a+rw . -R
+          nix-shell --command "umask 0022 && cmake --build build/"
+      - name: Populate _site
+        run: |
+          mkdir _site
+          cp build/vizfft.html _site/
+          cp build/vizfft.js _site/
+          cp build/vizfft.wasm _site/
+      - name: Upload artifact
+        # Automatically uploads an artifact from the './_site' directory by default
+        uses: actions/upload-pages-artifact@v1
+  deploy-emscripten:
+    needs: build-emscripten
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

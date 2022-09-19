@@ -35,9 +35,10 @@ public:
 
 class SafeGlfwWindow : NoCopy {
 public:
-  SafeGlfwWindow(const char *title = "imraii.h") {
-    const auto width = WINDOW_MIN_WIDTH;
-    const auto height = WINDOW_MIN_WIDTH * (9.0 / 16.0) * .5;
+  SafeGlfwWindow(const char *title = "imraii.h",
+                 const double width = WINDOW_MIN_WIDTH,
+                 const double height = WINDOW_MIN_WIDTH * (9.0 / 16.0) * .5,
+                 const double device_pixel_ratio = 5) {
     glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -48,7 +49,12 @@ public:
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 #endif
 
-    _window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    _window =
+        glfwCreateWindow(width * device_pixel_ratio,
+                         height * device_pixel_ratio, title, nullptr, nullptr);
+#ifdef __EMSCRIPTEN__
+    emscripten_set_canvas_size(width, height);
+#endif
   }
   ~SafeGlfwWindow() { glfwDestroyWindow(_window); }
 
