@@ -1,5 +1,6 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <emscripten/html5.h>
 
 #define GL_GLEXT_PROTOTYPES
 #define EGL_EGLEXT_PROTOTYPES
@@ -33,7 +34,7 @@ int main(int argc, char *argv[]) {
   SafeGlew glew;
   SafeImGui imguiContext(glfwWindow.window());
 
-  std::cerr << "glGetString(GL_VERSION): " << glGetString(GL_VERSION)
+  std::cout << "glGetString(GL_VERSION): " << glGetString(GL_VERSION)
             << std::endl;
 
   App app = {glfwCtx, glfwWindow, glew, imguiContext};
@@ -55,8 +56,10 @@ void App::frame() {
   GlfwFrame glfwFrame(glfwWindow.window());
   ImGuiGlfwFrame imguiFrame;
 
+  ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
   if (ImGui::Begin("hello")) {
     ImGui::Text("whatever2");
+    ImGui::Text("%d %d", glfwFrame.width(), glfwFrame.height());
   }
   ImGui::End();
 }

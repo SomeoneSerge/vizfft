@@ -12,7 +12,7 @@
 
 namespace ImRAII {
 // FIXME:
-constexpr double WINDOW_MIN_WIDTH = 1980;
+constexpr double WINDOW_MIN_WIDTH = 1920;
 
 class NoCopy {
 public:
@@ -37,8 +37,8 @@ class SafeGlfwWindow : NoCopy {
 public:
   SafeGlfwWindow(const char *title = "imraii.h",
                  const double width = WINDOW_MIN_WIDTH,
-                 const double height = WINDOW_MIN_WIDTH * (9.0 / 16.0) * .5,
-                 const double device_pixel_ratio = 5) {
+                 const double height = WINDOW_MIN_WIDTH * (9.0 / 16.0),
+                 const double device_pixel_ratio = 1.0) {
     glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -53,7 +53,7 @@ public:
         glfwCreateWindow(width * device_pixel_ratio,
                          height * device_pixel_ratio, title, nullptr, nullptr);
 #ifdef __EMSCRIPTEN__
-    emscripten_set_canvas_size(width, height);
+    auto _result = emscripten_set_canvas_element_size("canvas", width, height);
 #endif
   }
   ~SafeGlfwWindow() { glfwDestroyWindow(_window); }
@@ -170,6 +170,8 @@ protected:
 class GlfwFrame : NoCopy {
 public:
   GlfwFrame(GLFWwindow *window) : window(window) {
+    glfwGetFramebufferSize(window, &_width, &_height);
+
     glClearColor(.45f, .55f, .6f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -185,8 +187,12 @@ public:
     glfwPollEvents();
   }
 
+  int width() const { return _width; }
+  int height() const { return _height; }
+
 private:
   GLFWwindow *window;
+  int _width, _height;
 };
 
 class ImGuiGlfwFrame : NoCopy {
