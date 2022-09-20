@@ -8,20 +8,28 @@
     <style>
         body {
             margin: 0;
-            background-color: black
+            background-color: white
         }
 
         .emscripten {
             position: absolute;
             top: 0px;
             left: 0px;
-            margin: 0px;
-            border: 0;
-            width: 100%;
-            overflow: hidden;
+            padding-right: 0;
+            margin-left: auto;
+            margin-right: auto;
             display: block;
+            overflow: hidden;
+
+            width: 100%;
             image-rendering: optimizeSpeed;
             image-rendering: auto;
+        }
+
+        /* the canvas *must not* have any border or padding, or mouse coords will be wrong */
+        canvas.emscripten {
+            border: 0px none;
+            background-color: white;
         }
     </style>
 </head>
