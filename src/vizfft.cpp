@@ -9,6 +9,7 @@
 #include <GLES3/gl3.h>
 #endif
 
+#include "implot.h"
 #include "imraii.h"
 #include <functional>
 
@@ -41,7 +42,11 @@ void App::frame() {
     ImGui::Text("whatever2");
     ImGui::Text("%d %d", glfwFrame.width(), glfwFrame.height());
 
-    ImGui::Image(tex0.textureVoidStar(), {320, 240});
+    if (ImPlot::BeginPlot("whateverPlot", {320, 240})) {
+      ImPlot::PlotImage("whateverImage", tex0.textureVoidStar(), {0.0, 0.0},
+                        {1.0, 1.0});
+      ImPlot::EndPlot();
+    }
   }
   ImGui::End();
 }
