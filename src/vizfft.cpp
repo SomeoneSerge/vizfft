@@ -14,14 +14,37 @@
 
 using namespace ImRAII;
 
+using FloatGrayscale =
+    Eigen::Array<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
 struct App {
   SafeGlfwCtx &glfwCtx;
   SafeGlfwWindow &glfwWindow;
   SafeGlew &glew;
   SafeImGui &imguiContext;
+  SafeGlTexture tex0;
 
   void frame();
 };
+
+void App::frame() {
+
+  GlfwFrame glfwFrame(glfwWindow.window());
+  ImGuiGlfwFrame imguiFrame;
+
+  FloatGrayscale im = FloatGrayscale::Random(480, 640).abs();
+  tex0.reallocate(1, im.rows(), im.cols(), f32, GL_LINEAR, GL_NEAREST,
+                  im.data());
+
+  ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
+  if (ImGui::Begin("hello")) {
+    ImGui::Text("whatever2");
+    ImGui::Text("%d %d", glfwFrame.width(), glfwFrame.height());
+
+    ImGui::Image(tex0.textureVoidStar(), {320, 240});
+  }
+  ImGui::End();
+}
 
 std::function<void()> frame_global;
 void call_frame_global() { frame_global(); }
@@ -49,17 +72,4 @@ int main(int argc, char *argv[]) {
 #endif
 
   return 0;
-}
-
-void App::frame() {
-
-  GlfwFrame glfwFrame(glfwWindow.window());
-  ImGuiGlfwFrame imguiFrame;
-
-  ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
-  if (ImGui::Begin("hello")) {
-    ImGui::Text("whatever2");
-    ImGui::Text("%d %d", glfwFrame.width(), glfwFrame.height());
-  }
-  ImGui::End();
 }

@@ -1,13 +1,16 @@
 #ifndef _IM_RAII_H
 #define _IM_RAII_H
 
+#include <Eigen/Dense>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <cstring>
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <implot.h>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 
 namespace ImRAII {
@@ -208,76 +211,126 @@ public:
   }
 };
 
-// class SafeGlTexture : NoCopy {
-// public:
-//   SafeGlTexture(const Uint8Image &image,
-//                 const unsigned int interpolation = GL_LINEAR,
-//                 const unsigned int dtype = GL_UNSIGNED_BYTE)
-//       : data({.texture = 0,
-//               .xres = image.xres,
-//               .yres = image.yres,
-//               .channels = image.channels,
-//               .dtype = dtype,
-//               .interpolation = interpolation}) {
-//     glGenTextures(1, &data.texture);
-//     glBindTexture(GL_TEXTURE_2D, data.texture);
-//
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, interpolation);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, interpolation);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//
-//     reallocate(image.channels, image.yres, image.xres, interpolation, dtype,
-//                image.data.get());
-//   }
-//
-//   SafeGlTexture(SafeGlTexture &&other) : data(other.data) {
-//     other.data.texture = GL_INVALID_VALUE;
-//   }
-//
-//   ~SafeGlTexture();
-//
-//   GLuint texture() const { return data.texture; }
-//   void *textureVoidStar() const { return (void *)(intptr_t)data.texture; }
-//   unsigned int reallocate(const int channels, const int height, const int
-//   width,
-//                           const unsigned int interpolation = GL_LINEAR,
-//                           const unsigned int dtype = GL_UNSIGNED_BYTE,
-//                           const void *imageData = nullptr) {
-//
-//     this->data = {.texture = this->data.texture,
-//                   .xres = width,
-//                   .yres = height,
-//                   .channels = channels,
-//                   .dtype = dtype,
-//                   .interpolation = interpolation};
-//
-//     constexpr unsigned int modes[] = {0, GL_DEPTH_COMPONENT, 0, GL_RGB,
-//                                       GL_RGBA};
-//     if (channels != 1 && channels != 3 && channels != 4) {
-//       std::cerr << "[E] texture cannot have " << channels << " channels"
-//                 << std::endl;
-//       throw std::invalid_argument("invalid number of channels");
-//     }
-//     const auto mode = modes[channels];
-//     glTexImage2D(GL_TEXTURE_2D, 0, mode, data.xres, data.yres, 0, mode,
-//     dtype,
-//                  imageData);
-//     return texture();
-//   }
-//   void bind() { glBindTexture(GL_TEXTURE_2D, data.texture); }
-//   int xres() const { return data.xres; }
-//   int yres() const { return data.yres; }
-//   double aspect() const { return data.yres * 1.0 / data.xres; }
-//
-// private:
-//   struct {
-//     GLuint texture;
-//     int xres, yres, channels;
-//     unsigned int dtype;
-//     unsigned int interpolation;
-//   } data;
-// };
+enum DType { u8, i32, f16, f32 };
+
+template <typename Scalar> DType runtime_type();
+
+template <> DType runtime_type<uint8_t>() { return u8; }
+template <> DType runtime_type<Eigen::bfloat16>() { return f16; }
+template <> DType runtime_type<int32_t>() { return i32; }
+template <> DType runtime_type<float>() { return f32; }
+
+int dtype_itemsize(DType dtype) {
+  switch (dtype) {
+  case u8:
+    return 1;
+  case f16:
+    return 2;
+  case i32:
+  case f32:
+    return 4;
+  default:
+    std::abort();
+  }
+}
+
+GLenum dtype_to_gl(DType dtype) {
+  switch (dtype) {
+  case u8:
+    return GL_UNSIGNED_BYTE;
+  case f32:
+    return GL_FLOAT;
+  default:
+    std::abort();
+  }
+}
+
+class SafeGlTexture : NoCopy {
+public:
+  SafeGlTexture(const unsigned char *image = nullptr, const int rows = 480,
+                const int cols = 640, const int channels = 1,
+                const DType dtype = f32,
+                const unsigned int filter_min = GL_LINEAR,
+                const unsigned int filter_mag = GL_NEAREST)
+      : data({
+            .texture = 0,
+            .rows = rows,
+            .cols = cols,
+            .channels = channels,
+            .dtype = dtype,
+            .filter_min = filter_min,
+            .filter_mag = filter_mag,
+        }) {
+    glGenTextures(1, &data.texture);
+
+    reallocate(channels, data.rows, data.cols, dtype, filter_min, filter_mag,
+               image);
+  }
+
+  SafeGlTexture(SafeGlTexture &&other) : data(other.data) {
+    other.data.texture = GL_INVALID_VALUE;
+  }
+
+  ~SafeGlTexture() {
+    if (data.texture != GL_INVALID_VALUE) {
+      glDeleteTextures(1, &data.texture);
+    }
+  }
+
+  GLuint texture() const { return data.texture; }
+  void *textureVoidStar() const { return (void *)(intptr_t)data.texture; }
+  unsigned int reallocate(const int channels, const int rows, const int cols,
+                          const DType dtype,
+                          const unsigned int filter_min = GL_LINEAR,
+                          const unsigned int filter_mag = GL_NEAREST,
+                          const void *imageData = nullptr) {
+
+    this->data = {.texture = this->data.texture,
+                  .rows = rows,
+                  .cols = cols,
+                  .channels = channels,
+                  .dtype = dtype,
+                  .filter_min = filter_min,
+                  .filter_mag = filter_mag};
+
+    constexpr GLint modes[] = {0, GL_RED, 0, GL_RGB, GL_RGBA};
+    if (channels != 1 && channels != 3 && channels != 4) {
+      std::cerr << "[E] texture cannot have " << channels << " channels"
+                << std::endl;
+      throw std::invalid_argument("invalid number of channels");
+    }
+    const auto mode = modes[channels];
+
+    glBindTexture(GL_TEXTURE_2D, data.texture);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter_min);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter_mag);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    const auto width = data.cols;
+    const auto height = data.rows;
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT,
+                 imageData);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return texture();
+  }
+
+  void bind() { glBindTexture(GL_TEXTURE_2D, data.texture); }
+  int rows() const { return data.rows; }
+  int cols() const { return data.cols; }
+  double aspect() const { return data.rows * 1.0 / data.cols; }
+
+private:
+  struct {
+    GLuint texture;
+    int rows, cols, channels;
+    unsigned int dtype;
+    unsigned int filter_min;
+    unsigned int filter_mag;
+  } data;
+};
 }; // namespace ImRAII
 
 #endif
