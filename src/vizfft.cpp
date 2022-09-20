@@ -17,6 +17,7 @@ using namespace ImRAII;
 
 using FloatGrayscale =
     Eigen::Array<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+using VectorXf = Eigen::Array<float, 1, Eigen::Dynamic, Eigen::RowMajor>;
 
 struct App {
   SafeGlfwCtx &glfwCtx;
@@ -33,7 +34,12 @@ void App::frame() {
   GlfwFrame glfwFrame(glfwWindow.window());
   ImGuiGlfwFrame imguiFrame;
 
-  FloatGrayscale im = FloatGrayscale::Random(480, 640).abs();
+  const auto cols = 640, rows = 320;
+  const auto uu = VectorXf::LinSpaced(cols, 0, 1.0).colwise().replicate(rows);
+  const auto vv =
+      VectorXf::LinSpaced(rows, 0, 1.0).transpose().rowwise().replicate(cols);
+  FloatGrayscale im = (10 * uu + 5 * vv).sin();
+
   tex0.reallocate(1, im.rows(), im.cols(), f32, GL_LINEAR, GL_NEAREST,
                   im.data());
 
