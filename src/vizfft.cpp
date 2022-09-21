@@ -52,9 +52,7 @@ void App::frame() {
                           .transpose()
                           .rowwise()
                           .replicate(cols);
-      const auto xx = uu;
-      const auto yy = 1.0 - vv;
-      FloatGrayscale im = (coef_a * xx + coef_b * yy).sin();
+      FloatGrayscale im = (coef_a * uu + coef_b * vv).sin();
 
       tex0.reallocate(1, im.rows(), im.cols(), f32, GL_LINEAR, GL_NEAREST,
                       im.data());
