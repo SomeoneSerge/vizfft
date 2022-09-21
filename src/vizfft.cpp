@@ -26,6 +26,8 @@ struct App {
   SafeImGui &imguiContext;
   SafeGlTexture tex0;
 
+  float coef_a = 1.0, coef_b = 1.0;
+
   void frame();
 };
 
@@ -34,19 +36,29 @@ void App::frame() {
   GlfwFrame glfwFrame(glfwWindow.window());
   ImGuiGlfwFrame imguiFrame;
 
-  const auto cols = 640, rows = 320;
-  const auto uu = VectorXf::LinSpaced(cols, 0, 1.0).colwise().replicate(rows);
-  const auto vv =
-      VectorXf::LinSpaced(rows, 0, 1.0).transpose().rowwise().replicate(cols);
-  FloatGrayscale im = (10 * uu + 5 * vv).sin();
-
-  tex0.reallocate(1, im.rows(), im.cols(), f32, GL_LINEAR, GL_NEAREST,
-                  im.data());
-
   ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
   if (ImGui::Begin("hello")) {
     ImGui::Text("whatever2");
     ImGui::Text("%d %d", glfwFrame.width(), glfwFrame.height());
+
+    ImGui::SliderFloat("a", &coef_a, -100.0, 100.0);
+    ImGui::SliderFloat("b", &coef_b, -100.0, 100.0);
+
+    {
+      const auto cols = 640, rows = 320;
+      const auto uu =
+          VectorXf::LinSpaced(cols, 0, 1.0).colwise().replicate(rows);
+      const auto vv = VectorXf::LinSpaced(rows, 0, 1.0)
+                          .transpose()
+                          .rowwise()
+                          .replicate(cols);
+      const auto xx = uu;
+      const auto yy = 1.0 - vv;
+      FloatGrayscale im = (coef_a * xx + coef_b * yy).sin();
+
+      tex0.reallocate(1, im.rows(), im.cols(), f32, GL_LINEAR, GL_NEAREST,
+                      im.data());
+    }
 
     if (ImPlot::BeginPlot("whateverPlot", {320, 240})) {
       ImPlot::PlotImage("whateverImage", tex0.textureVoidStar(), {0.0, 0.0},
