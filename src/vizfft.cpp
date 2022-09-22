@@ -45,6 +45,11 @@ MatrixXYcf fft2_copy(FloatGrayscale img) {
 }
 
 template <typename Derived> void fftshift2(Eigen::MatrixBase<Derived> &m) {
+  if (m.rows() % 2 != 0 || m.cols() % 2 != 0) {
+    std::cerr << "TODO: Handle odd sizes in fftshift2" << std::endl;
+    std::abort();
+  }
+
   m.topRows(m.rows() / 2).swap(m.bottomRows(m.rows() / 2));
   m.leftCols(m.cols() / 2).swap(m.rightCols(m.cols() / 2));
 }
