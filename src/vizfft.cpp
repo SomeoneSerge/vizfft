@@ -54,6 +54,13 @@ template <typename Derived> void fftshift2(Eigen::MatrixBase<Derived> &m) {
   m.leftCols(m.cols() / 2).swap(m.rightCols(m.cols() / 2));
 }
 
+struct State {
+  bool mulWindow = false;
+  float coef_a = 100.0, coef_b = 10.0;
+
+  bool operator==(const State &) const = default;
+};
+
 struct App {
   SafeGlfwCtx &glfwCtx;
   SafeGlfwWindow &glfwWindow;
@@ -61,8 +68,9 @@ struct App {
   SafeImGui &imguiContext;
   SafeGlTexture tex0, texAbs, texRe, texIm;
 
-  bool mulWindow = false;
-  float coef_a = 100.0, coef_b = 10.0;
+  State prev = {false, std::numeric_limits<float>::quiet_NaN(),
+                std::numeric_limits<float>::quiet_NaN()};
+  State current;
 
   void frame();
 };
@@ -74,12 +82,13 @@ void App::frame() {
 
   ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
   if (ImGui::Begin("hello")) {
-    ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}", &mulWindow);
+    ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
+                    &current.mulWindow);
 
-    ImGui::SliderFloat("a", &coef_a, -196.0, 196.0);
-    ImGui::SliderFloat("b", &coef_b, -196.0, 196.0);
+    ImGui::SliderFloat("a", &current.coef_a, -196.0, 196.0);
+    ImGui::SliderFloat("b", &current.coef_b, -196.0, 196.0);
 
-    {
+    if (!(current == prev)) {
       const auto cols = 256, rows = 256;
       const auto uu =
           VectorXf::LinSpaced(cols, -1.0, 1.0).colwise().replicate(rows);
@@ -90,9 +99,11 @@ void App::frame() {
       const auto window =
           (-(uu.array().pow(2.0) + vv.array().pow(2.0)) / std::sqrt(0.5)).exp();
       FloatGrayscale src =
-          ((coef_a * uu.array() + coef_b * vv.array()) * .5).sin().matrix();
+          ((current.coef_a * uu.array() + current.coef_b * vv.array()) * .5)
+              .sin()
+              .matrix();
 
-      if (mulWindow) {
+      if (current.mulWindow) {
         src.array() *= window;
       }
 
@@ -118,6 +129,7 @@ void App::frame() {
                        GL_NEAREST, reFft2.data());
       texIm.reallocate(1, imFft2.rows(), imFft2.cols(), f32, GL_LINEAR,
                        GL_NEAREST, imFft2.data());
+      prev = current;
     }
 
     if (ImPlot::BeginPlot("srcImage", {480, 480})) {

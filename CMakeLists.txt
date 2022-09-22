@@ -4,7 +4,7 @@ project(vizfft)
 
 option(BUILD_EMSCRIPTEN "Build the emscripten target" ON)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE BOTH)
 
