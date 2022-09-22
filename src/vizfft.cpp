@@ -61,12 +61,48 @@ struct State {
   bool operator==(const State &) const = default;
 };
 
+struct Heatmap {
+  /* Linearly normalized heatmap */
+
+  float minCoeff, maxCoeff;
+  float minDisplay, maxDisplay;
+  FloatGrayscale normalizedMap;
+  FloatGrayscale tex;
+
+  Heatmap()
+      : minCoeff(std::numeric_limits<float>::quiet_NaN()),
+        maxCoeff(std::numeric_limits<float>::quiet_NaN()),
+        minDisplay(std::numeric_limits<float>::quiet_NaN()),
+        maxDisplay(std::numeric_limits<float>::quiet_NaN()) {}
+
+  Heatmap(const FloatGrayscale &src) { load(src); }
+
+  template <typename Derived> void load(const Eigen::MatrixBase<Derived> &src) {
+    minCoeff = src.minCoeff();
+    maxCoeff = src.maxCoeff();
+    const auto h = std::max(maxCoeff - minCoeff, 1e-9f);
+    const auto mi = .5 * minCoeff + .5 * maxCoeff;
+    normalizedMap = (src.array() - mi) / h;
+  }
+
+  void computeTex(const float newMin, const float newMax) {
+    minDisplay = newMin;
+    maxDisplay = newMax;
+    const auto oldMi = .5 * minCoeff + .5 * maxCoeff;
+    const auto oldH = std::max(maxCoeff - minCoeff, 1e-9f);
+    const auto newH = std::max(maxDisplay - minDisplay, 1e-9f);
+    tex = normalizedMap.array() * (oldH / newH) + (oldMi - minDisplay) / newH;
+    tex = tex.array().min(1.0).max(0.0);
+  }
+};
+
 struct App {
   SafeGlfwCtx &glfwCtx;
   SafeGlfwWindow &glfwWindow;
   SafeGlew &glew;
   SafeImGui &imguiContext;
   SafeGlTexture tex0, texAbs, texRe, texIm;
+  Heatmap heatAbs, heatRe, heatIm;
 
   State prev = {false, std::numeric_limits<float>::quiet_NaN(),
                 std::numeric_limits<float>::quiet_NaN()};
@@ -110,25 +146,27 @@ void App::frame() {
       MatrixXYcf fft2Src = fft2_copy(src);
       fftshift2(fft2Src);
 
-      FloatGrayscale absFft2 = fft2Src.array().abs();
-      absFft2 = absFft2 / absFft2.maxCoeff();
+      heatAbs.load(fft2Src.cwiseAbs());
+      heatRe.load(fft2Src.real());
+      heatIm.load(fft2Src.imag());
 
-      FloatGrayscale reFft2 = fft2Src.real();
-      reFft2 = reFft2.array() - reFft2.minCoeff();
-      reFft2 = reFft2 / reFft2.maxCoeff();
+      const auto lo = std::min(std::min(heatAbs.minCoeff, heatRe.minCoeff),
+                               heatIm.minCoeff);
+      const auto hi = std::max(std::max(heatAbs.maxCoeff, heatRe.maxCoeff),
+                               heatIm.maxCoeff);
 
-      FloatGrayscale imFft2 = fft2Src.imag();
-      imFft2 = imFft2.array() - imFft2.minCoeff();
-      imFft2 = imFft2 / imFft2.maxCoeff();
+      heatAbs.computeTex(0, hi);
+      heatRe.computeTex(lo, hi);
+      heatIm.computeTex(lo, hi);
 
       tex0.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
                       src.data());
-      texAbs.reallocate(1, absFft2.rows(), absFft2.cols(), f32, GL_LINEAR,
-                        GL_NEAREST, absFft2.data());
-      texRe.reallocate(1, reFft2.rows(), reFft2.cols(), f32, GL_LINEAR,
-                       GL_NEAREST, reFft2.data());
-      texIm.reallocate(1, imFft2.rows(), imFft2.cols(), f32, GL_LINEAR,
-                       GL_NEAREST, imFft2.data());
+      texAbs.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
+                        heatAbs.tex.data());
+      texRe.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
+                       heatRe.tex.data());
+      texIm.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
+                       heatIm.tex.data());
       prev = current;
     }
 
