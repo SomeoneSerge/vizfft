@@ -12,6 +12,7 @@
 #include "implot.h"
 #include "imraii.h"
 #include <functional>
+#include <numbers>
 #include <unsupported/Eigen/FFT>
 
 using namespace ImRAII;
@@ -56,7 +57,7 @@ template <typename Derived> void fftshift2(Eigen::MatrixBase<Derived> &m) {
 
 struct State {
   bool mulWindow = false;
-  float coef_a = 100.0, coef_b = 10.0;
+  float coef_a = 100.0 / std::numbers::pi, coef_b = 10.0 / std::numbers::pi;
 
   bool operator==(const State &) const = default;
 };
@@ -111,6 +112,8 @@ struct App {
   void frame();
 };
 
+constexpr auto nyquist = 128;
+
 void App::frame() {
 
   GlfwFrame glfwFrame(glfwWindow.window());
@@ -121,11 +124,11 @@ void App::frame() {
     ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
                     &current.mulWindow);
 
-    ImGui::SliderFloat("a", &current.coef_a, -196.0, 196.0);
-    ImGui::SliderFloat("b", &current.coef_b, -196.0, 196.0);
+    ImGui::SliderFloat("a", &current.coef_a, -nyquist, nyquist);
+    ImGui::SliderFloat("b", &current.coef_b, -nyquist, nyquist);
 
     if (!(current == prev)) {
-      const auto cols = 256, rows = 256;
+      const auto cols = nyquist * 2, rows = nyquist * 2;
       const auto uu =
           VectorXf::LinSpaced(cols, -1.0, 1.0).colwise().replicate(rows);
       const auto vv = VectorXf::LinSpaced(rows, -1.0, 1.0)
@@ -135,7 +138,8 @@ void App::frame() {
       const auto window =
           (-(uu.array().pow(2.0) + vv.array().pow(2.0)) / std::sqrt(0.5)).exp();
       FloatGrayscale src =
-          ((current.coef_a * uu.array() + current.coef_b * vv.array()) * .5)
+          ((current.coef_a * uu.array() + current.coef_b * vv.array()) *
+           std::numbers::pi)
               .sin()
               .matrix();
 
