@@ -102,8 +102,8 @@ struct App {
   SafeGlfwWindow &glfwWindow;
   SafeGlew &glew;
   SafeImGui &imguiContext;
-  SafeGlTexture tex0, texAbs, texRe, texIm;
-  Heatmap heatAbs, heatRe, heatIm;
+  SafeGlTexture tex0, texAbs, texArg;
+  Heatmap heatAbs, heatArg;
 
   State prev = {false, std::numeric_limits<float>::quiet_NaN(),
                 std::numeric_limits<float>::quiet_NaN()};
@@ -119,8 +119,10 @@ void App::frame() {
   GlfwFrame glfwFrame(glfwWindow.window());
   ImGuiGlfwFrame imguiFrame;
 
+  ImVec2 srcWindowSize = {500.0f, 600.0f};
+  ImGui::SetNextWindowSize(srcWindowSize, ImGuiCond_Once);
   ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
-  if (ImGui::Begin("hello")) {
+  if (ImGui::Begin("Input image")) {
     ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
                     &current.mulWindow);
 
@@ -151,26 +153,20 @@ void App::frame() {
       fftshift2(fft2Src);
 
       heatAbs.load(fft2Src.cwiseAbs());
-      heatRe.load(fft2Src.real());
-      heatIm.load(fft2Src.imag());
+      heatArg.load(fft2Src.cwiseArg());
 
-      const auto lo = std::min(std::min(heatAbs.minCoeff, heatRe.minCoeff),
-                               heatIm.minCoeff);
-      const auto hi = std::max(std::max(heatAbs.maxCoeff, heatRe.maxCoeff),
-                               heatIm.maxCoeff);
+      const auto lo = heatAbs.minCoeff;
+      const auto hi = heatAbs.maxCoeff;
 
       heatAbs.computeTex(0, hi);
-      heatRe.computeTex(lo, hi);
-      heatIm.computeTex(lo, hi);
+      heatArg.computeTex(-std::numbers::pi, std::numbers::pi);
 
       tex0.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
                       src.data());
       texAbs.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
                         heatAbs.tex.data());
-      texRe.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
-                       heatRe.tex.data());
-      texIm.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
-                       heatIm.tex.data());
+      texArg.reallocate(1, src.rows(), src.cols(), f32, GL_LINEAR, GL_NEAREST,
+                        heatArg.tex.data());
       prev = current;
     }
 
@@ -178,21 +174,19 @@ void App::frame() {
       ImPlot::PlotImage("src", tex0.textureVoidStar(), {0.0, 0.0}, {1.0, 1.0});
       ImPlot::EndPlot();
     }
-    ImGui::SameLine();
+  }
+  ImGui::End();
+
+  ImGui::SetNextWindowPos({srcWindowSize.x + 10 + 10, 10}, ImGuiCond_Once);
+  if (ImGui::Begin("Magnitude-Phase")) {
     if (ImPlot::BeginPlot("abs(fft2(src)) plot", {480, 480})) {
       ImPlot::PlotImage("abs(fft2(src))", texAbs.textureVoidStar(), {0.0, 0.0},
                         {1.0, 1.0});
       ImPlot::EndPlot();
     }
-
-    if (ImPlot::BeginPlot("Re(fft2(src)) plot", {480, 480})) {
-      ImPlot::PlotImage("Re(fft2(src))", texRe.textureVoidStar(), {0.0, 0.0},
-                        {1.0, 1.0});
-      ImPlot::EndPlot();
-    }
     ImGui::SameLine();
-    if (ImPlot::BeginPlot("Im(fft2(src)) plot", {480, 480})) {
-      ImPlot::PlotImage("Im(fft2(src))", texIm.textureVoidStar(), {0.0, 0.0},
+    if (ImPlot::BeginPlot("arg(fft2(src)) plot", {480, 480})) {
+      ImPlot::PlotImage("arg(fft2(src))", texArg.textureVoidStar(), {0.0, 0.0},
                         {1.0, 1.0});
       ImPlot::EndPlot();
     }
