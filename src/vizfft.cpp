@@ -122,7 +122,7 @@ void App::frame() {
   ImVec2 srcWindowSize = {500.0f, 600.0f};
   ImGui::SetNextWindowSize(srcWindowSize, ImGuiCond_Once);
   ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
-  if (ImGui::Begin("Input image")) {
+  if (ImBeginWindow wnd("Input image"); wnd.visible) {
     ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
                     &current.mulWindow);
 
@@ -170,28 +170,23 @@ void App::frame() {
       prev = current;
     }
 
-    if (ImPlot::BeginPlot("srcImage", {480, 480})) {
+    if (ImBeginPlot plt("srcImage", {480, 480}); plt.visible) {
       ImPlot::PlotImage("src", tex0.textureVoidStar(), {0.0, 0.0}, {1.0, 1.0});
-      ImPlot::EndPlot();
     }
   }
-  ImGui::End();
 
   ImGui::SetNextWindowPos({srcWindowSize.x + 10 + 10, 10}, ImGuiCond_Once);
-  if (ImGui::Begin("Magnitude-Phase")) {
-    if (ImPlot::BeginPlot("abs(fft2(src)) plot", {480, 480})) {
+  if (ImBeginWindow wnd("Magnitude-Phase"); wnd.visible) {
+    if (ImBeginPlot plt("abs(fft2(src)) plot", {480, 480}); plt.visible) {
       ImPlot::PlotImage("abs(fft2(src))", texAbs.textureVoidStar(), {0.0, 0.0},
                         {1.0, 1.0});
-      ImPlot::EndPlot();
     }
     ImGui::SameLine();
-    if (ImPlot::BeginPlot("arg(fft2(src)) plot", {480, 480})) {
+    if (ImBeginPlot plt("arg(fft2(src)) plot", {480, 480}); plt.visible) {
       ImPlot::PlotImage("arg(fft2(src))", texArg.textureVoidStar(), {0.0, 0.0},
                         {1.0, 1.0});
-      ImPlot::EndPlot();
     }
   }
-  ImGui::End();
 }
 
 std::function<void()> frame_global;

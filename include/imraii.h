@@ -331,6 +331,31 @@ private:
     unsigned int filter_mag;
   } data;
 };
+
+struct ImBeginWindow {
+  bool visible;
+
+  ImBeginWindow(const char *name = "An imgui window", bool *p_open = nullptr,
+                ImGuiWindowFlags_ flags = ImGuiWindowFlags_None) {
+    visible = ImGui::Begin(name, p_open, flags);
+  }
+  ~ImBeginWindow() { ImGui::End(); }
+};
+
+struct ImBeginPlot {
+  bool visible;
+
+  ImBeginPlot(const char *title_id = "An imgui window",
+              const ImVec2 &size = ImVec2(-1, 0),
+              ImPlotFlags_ flags = ImPlotFlags_None) {
+    visible = ImPlot::BeginPlot(title_id, size, flags);
+  }
+  ~ImBeginPlot() {
+    if (visible) {
+      ImPlot::EndPlot();
+    }
+  }
+};
 }; // namespace ImRAII
 
 #endif
