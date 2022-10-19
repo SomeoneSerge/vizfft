@@ -57,7 +57,10 @@ template <typename Derived> void fftshift2(Eigen::MatrixBase<Derived> &m) {
 
 struct State {
   bool mulWindow = false;
-  float coef_a = 100.0 / std::numbers::pi, coef_b = 10.0 / std::numbers::pi;
+  bool logAbs = true;
+  float windowCoef = 1.0;
+  float coef_a = 100.0 / std::numbers::pi;
+  float coef_b = 10.0 / std::numbers::pi;
 
   bool operator==(const State &) const = default;
 };
@@ -105,8 +108,9 @@ struct App {
   SafeGlTexture tex0, texAbs, texArg;
   Heatmap heatAbs, heatArg;
 
-  State prev = {false, std::numeric_limits<float>::quiet_NaN(),
-                std::numeric_limits<float>::quiet_NaN()};
+  State prev = {.mulWindow = false,
+                .coef_a = std::numeric_limits<float>::quiet_NaN(),
+                .coef_b = std::numeric_limits<float>::quiet_NaN()};
   State current;
 
   void frame();
@@ -125,7 +129,10 @@ void App::frame() {
   if (ImBeginWindow wnd("Input image"); wnd.visible) {
     ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
                     &current.mulWindow);
+    ImGui::Checkbox("Log scale absolute value",
+                    &current.logAbs);
 
+    ImGui::SliderFloat("window coefficient", &current.windowCoef, 0.1, 10.0);
     ImGui::SliderFloat("a", &current.coef_a, -nyquist, nyquist);
     ImGui::SliderFloat("b", &current.coef_b, -nyquist, nyquist);
 
@@ -137,8 +144,9 @@ void App::frame() {
                           .transpose()
                           .rowwise()
                           .replicate(cols);
-      const auto window =
-          (-(uu.array().pow(2.0) + vv.array().pow(2.0)) / std::sqrt(0.5)).exp();
+      const auto window = (-(uu.array().pow(2.0) + vv.array().pow(2.0)) /
+                           std::sqrt(0.5) * current.windowCoef)
+                              .exp();
       FloatGrayscale src =
           ((current.coef_a * uu.array() + current.coef_b * vv.array()) *
            std::numbers::pi)
@@ -152,7 +160,11 @@ void App::frame() {
       MatrixXYcf fft2Src = fft2_copy(src);
       fftshift2(fft2Src);
 
-      heatAbs.load(fft2Src.cwiseAbs());
+      if (current.logAbs) {
+        heatAbs.load(fft2Src.array().abs().log().abs().matrix());
+      } else {
+        heatAbs.load(fft2Src.cwiseAbs());
+      };
       heatArg.load(fft2Src.cwiseArg());
 
       const auto lo = heatAbs.minCoeff;
