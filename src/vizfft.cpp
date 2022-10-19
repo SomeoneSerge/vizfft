@@ -59,7 +59,7 @@ struct State {
   bool mulWindow = true;
   bool logAbs = true;
   float windowStd = .125;
-  float coef_a = 100.0 / std::numbers::pi;
+  float coef_a = 25.0 / std::numbers::pi;
   float coef_b = 10.0 / std::numbers::pi;
 
   bool operator==(const State &) const = default;
@@ -100,6 +100,8 @@ struct Heatmap {
   }
 };
 
+constexpr auto nyquist = 128;
+
 struct App {
   SafeGlfwCtx &glfwCtx;
   SafeGlfwWindow &glfwWindow;
@@ -107,6 +109,7 @@ struct App {
   SafeImGui &imguiContext;
   SafeGlTexture tex0, texAbs, texArg;
   Heatmap heatAbs, heatArg;
+  ImEditVec2 editCoeffs;
 
   State prev = {.mulWindow = false,
                 .coef_a = std::numeric_limits<float>::quiet_NaN(),
@@ -116,8 +119,6 @@ struct App {
   void frame();
 };
 
-constexpr auto nyquist = 128;
-
 void App::frame() {
 
   GlfwFrame glfwFrame(glfwWindow.window());
@@ -125,7 +126,7 @@ void App::frame() {
 
   ImVec2 srcWindowSize = {500.0f, 640.0f};
   ImGui::SetNextWindowSize(srcWindowSize, ImGuiCond_Once);
-  ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
+  ImGui::SetNextWindowPos(ImVec2(10.0, 10.0), ImGuiCond_Once);
   if (ImBeginWindow wnd("Input image"); wnd.visible) {
     if (!(current == prev)) {
       const auto cols = nyquist * 2, rows = nyquist * 2;
@@ -179,8 +180,8 @@ void App::frame() {
 
     ImGui::Checkbox("Log scale absolute value", &current.logAbs);
 
-    ImGui::SliderFloat("a", &current.coef_a, -nyquist, nyquist);
-    ImGui::SliderFloat("b", &current.coef_b, -nyquist, nyquist);
+    ImGui::Text("Frequencies along x and y");
+    editCoeffs.show(current.coef_a, current.coef_b);
 
     ImGui::Checkbox("Apply Gaussian window", &current.mulWindow);
     if (current.mulWindow) {
@@ -189,7 +190,8 @@ void App::frame() {
     }
   }
 
-  ImGui::SetNextWindowPos({srcWindowSize.x + 10 + 10, 10}, ImGuiCond_Once);
+  ImGui::SetNextWindowPos(ImVec2(srcWindowSize.x + 10 + 10, 10),
+                          ImGuiCond_Once);
   if (ImBeginWindow wnd("Magnitude-Phase"); wnd.visible) {
     const char *absPlotTitle =
         current.logAbs ? "log(abs(fft2(src)))" : "abs(fft2(src))";
@@ -224,7 +226,12 @@ int main(int argc, char *argv[]) {
   std::cout << "glGetString(GL_VERSION): " << glGetString(GL_VERSION)
             << std::endl;
 
-  App app = {glfwCtx, glfwWindow, glew, imguiContext};
+  App app = {.glfwCtx = glfwCtx,
+             .glfwWindow = glfwWindow,
+             .glew = glew,
+             .imguiContext = imguiContext,
+             .editCoeffs = ImEditVec2("coeffs", ImVec2(-nyquist, nyquist),
+                                      ImVec2(-nyquist, nyquist))};
 
 #ifdef __EMSCRIPTEN__
   frame_global = [&]() { app.frame(); };

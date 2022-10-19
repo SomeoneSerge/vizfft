@@ -9,8 +9,10 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 #include <implot.h>
+#include <iomanip>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 
 namespace ImRAII {
@@ -361,6 +363,62 @@ struct ImPushId {
   ImPushId(const char *id) { ImGui::PushID(id); }
   ImPushId(int id) { ImGui::PushID(id); }
   ~ImPushId() { ImGui::PopID(); }
+};
+
+struct ImEditVec2 {
+  struct Vec2Data {
+    ImVec2 mouseStart;
+    ImVec2 valueStart;
+  };
+
+  std::optional<Vec2Data> edit;
+  ImVec2 boundsMin, boundsMax;
+  const char *id;
+  std::ostringstream ss;
+  std::string s;
+
+  ImEditVec2(const char *id, ImVec2 boundsMin, ImVec2 boundsMax)
+      : boundsMin(boundsMin), boundsMax(boundsMax), id(id) {}
+
+  bool dragging() const { return edit.has_value(); }
+
+  bool show(float &x, float &y) {
+    ImPushId _id(id);
+    ss.str("");
+    ss << "[" << std::setfill('0') << std::setw(4) << std::setprecision(1)
+       << std::fixed << x << "]" << std::endl
+       << "[" << std::setfill('0') << std::setw(4) << std::setprecision(1)
+       << std::fixed << y << "]";
+    s = ss.str();
+
+    const auto visible = ImGui::Button(s.c_str());
+
+    const auto click = ImGui::IsItemClicked();
+    const auto mouseDown = ImGui::IsMouseDown(0);
+    const auto coords = ImGui::GetMousePos();
+
+    if (click and not dragging()) {
+      std::cerr << "click" << (dragging() ? "draging" : "not dragging")
+                << std::endl;
+      edit = {coords, ImVec2(x, y)};
+    }
+
+    if (dragging() and not mouseDown) {
+      std::cerr << "up" << std::endl;
+      edit.reset();
+    }
+
+    if (dragging()) {
+      const auto dx = (coords.x - edit->mouseStart.x);
+      const auto dy = -(coords.y - edit->mouseStart.y);
+      constexpr auto speed = 0.25f;
+      x = edit->valueStart.x + speed * dx;
+      y = edit->valueStart.y + speed * dy;
+    }
+    return visible;
+  }
+
+  ~ImEditVec2() {}
 };
 
 }; // namespace ImRAII
