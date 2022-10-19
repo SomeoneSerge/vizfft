@@ -398,13 +398,10 @@ struct ImEditVec2 {
     const auto coords = ImGui::GetMousePos();
 
     if (click and not dragging()) {
-      std::cerr << "click" << (dragging() ? "draging" : "not dragging")
-                << std::endl;
       edit = {coords, ImVec2(x, y)};
     }
 
     if (dragging() and not mouseDown) {
-      std::cerr << "up" << std::endl;
       edit.reset();
     }
 
