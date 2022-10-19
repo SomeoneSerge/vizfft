@@ -191,8 +191,15 @@ void App::frame() {
 
   ImGui::SetNextWindowPos({srcWindowSize.x + 10 + 10, 10}, ImGuiCond_Once);
   if (ImBeginWindow wnd("Magnitude-Phase"); wnd.visible) {
-    if (ImBeginPlot plt("abs(fft2(src)) plot", {480, 480}); plt.visible) {
-      ImPlot::PlotImage("abs(fft2(src))", texAbs.textureVoidStar(), {0.0, 0.0},
+    const char *absPlotTitle =
+        current.logAbs ? "log(abs(fft2(src)))" : "abs(fft2(src))";
+    if (struct {
+          ImPushId pltId;
+          ImBeginPlot plt;
+        } s{.pltId = ImPushId("absPlot"),
+            .plt = ImBeginPlot(absPlotTitle, {480, 480})};
+        s.plt.visible) {
+      ImPlot::PlotImage(absPlotTitle, texAbs.textureVoidStar(), {0.0, 0.0},
                         {1.0, 1.0});
     }
     ImGui::SameLine();

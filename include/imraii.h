@@ -356,6 +356,13 @@ struct ImBeginPlot {
     }
   }
 };
+
+struct ImPushId {
+  ImPushId(const char *id) { ImGui::PushID(id); }
+  ImPushId(int id) { ImGui::PushID(id); }
+  ~ImPushId() { ImGui::PopID(); }
+};
+
 }; // namespace ImRAII
 
 #endif
