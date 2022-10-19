@@ -56,9 +56,9 @@ template <typename Derived> void fftshift2(Eigen::MatrixBase<Derived> &m) {
 }
 
 struct State {
-  bool mulWindow = false;
+  bool mulWindow = true;
   bool logAbs = true;
-  float windowCoef = 1.0;
+  float windowStd = .125;
   float coef_a = 100.0 / std::numbers::pi;
   float coef_b = 10.0 / std::numbers::pi;
 
@@ -123,19 +123,10 @@ void App::frame() {
   GlfwFrame glfwFrame(glfwWindow.window());
   ImGuiGlfwFrame imguiFrame;
 
-  ImVec2 srcWindowSize = {500.0f, 600.0f};
+  ImVec2 srcWindowSize = {500.0f, 640.0f};
   ImGui::SetNextWindowSize(srcWindowSize, ImGuiCond_Once);
   ImGui::SetNextWindowPos({10.0, 10.0}, ImGuiCond_Once);
   if (ImBeginWindow wnd("Input image"); wnd.visible) {
-    ImGui::Checkbox("Multiply by e^{-\\frac{1}{...}(xx^2 + yy^2)}",
-                    &current.mulWindow);
-    ImGui::Checkbox("Log scale absolute value",
-                    &current.logAbs);
-
-    ImGui::SliderFloat("window coefficient", &current.windowCoef, 0.1, 10.0);
-    ImGui::SliderFloat("a", &current.coef_a, -nyquist, nyquist);
-    ImGui::SliderFloat("b", &current.coef_b, -nyquist, nyquist);
-
     if (!(current == prev)) {
       const auto cols = nyquist * 2, rows = nyquist * 2;
       const auto uu =
@@ -145,7 +136,7 @@ void App::frame() {
                           .rowwise()
                           .replicate(cols);
       const auto window = (-(uu.array().pow(2.0) + vv.array().pow(2.0)) /
-                           std::sqrt(0.5) * current.windowCoef)
+                           std::sqrt(current.windowStd))
                               .exp();
       FloatGrayscale src =
           ((current.coef_a * uu.array() + current.coef_b * vv.array()) *
@@ -184,6 +175,17 @@ void App::frame() {
 
     if (ImBeginPlot plt("srcImage", {480, 480}); plt.visible) {
       ImPlot::PlotImage("src", tex0.textureVoidStar(), {0.0, 0.0}, {1.0, 1.0});
+    }
+
+    ImGui::Checkbox("Log scale absolute value", &current.logAbs);
+
+    ImGui::SliderFloat("a", &current.coef_a, -nyquist, nyquist);
+    ImGui::SliderFloat("b", &current.coef_b, -nyquist, nyquist);
+
+    ImGui::Checkbox("Apply Gaussian window", &current.mulWindow);
+    if (current.mulWindow) {
+      ImGui::SliderFloat("std", &current.windowStd, 0.005, 1.0, nullptr,
+                         ImGuiSliderFlags_Logarithmic);
     }
   }
 
