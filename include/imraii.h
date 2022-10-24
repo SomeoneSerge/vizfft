@@ -205,6 +205,11 @@ public:
   ImGuiGlfwFrame() {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
+
+
+    /* Fix negative DeltaTime in firefox */
+    auto &io = ImGui::GetIO();
+    io.DeltaTime = std::max(1e-9f, io.DeltaTime);
     ImGui::NewFrame();
   }
   ~ImGuiGlfwFrame() {
