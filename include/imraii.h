@@ -2,12 +2,21 @@
 #define _IM_RAII_H
 
 #include <Eigen/Dense>
+
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
 #include <cstring>
 #include <imgui.h>
-#include <imgui_impl_glfw.h>
+
 #include <imgui_impl_opengl3.h>
+#include <imgui_impl_sdl.h>
+
+#include <SDL.h>
+#if defined(IMGUI_IMPL_OPENGL_ES2)
+#include <SDL_opengles2.h>
+#else
+#include <SDL_opengl.h>
+#endif
+
 #include <implot.h>
 #include <iomanip>
 #include <iostream>
@@ -28,74 +37,77 @@ public:
   NoCopy operator=(const NoCopy &) = delete;
 };
 
-class SafeGlfwCtx : NoCopy {
+class SafeSDLSession : NoCopy {
 public:
-  SafeGlfwCtx() {
-    if (!glfwInit()) {
-      throw std::runtime_error("glfwInit() failed");
+  SafeSDLSession() {
+    if (0 != SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER)) {
+      std::cerr << "SDL_Init() failed: " << SDL_GetError() << std::endl;
+      std::abort();
     }
   }
-  ~SafeGlfwCtx() { glfwTerminate(); }
+  ~SafeSDLSession() { SDL_Quit(); }
 };
 
-class SafeGlfwWindow : NoCopy {
+class SafeSDLWindow : NoCopy {
 public:
-  SafeGlfwWindow(const char *title = "imraii.h",
-                 const double width = WINDOW_MIN_WIDTH,
-                 const double height = WINDOW_MIN_WIDTH * (9.0 / 16.0),
-                 const double device_pixel_ratio = 1.0) {
-    glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  SafeSDLWindow(const char *title = "imraii.h",
+                const double width = WINDOW_MIN_WIDTH,
+                const double height = WINDOW_MIN_WIDTH * (9.0 / 16.0),
+                const double device_pixel_ratio = 1.0) {
 
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
 #ifdef __EMSCRIPTEN__
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
+    // glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_ES_API);
 #endif
 
-    _window =
-        glfwCreateWindow(width * device_pixel_ratio,
-                         height * device_pixel_ratio, title, nullptr, nullptr);
+    SDL_WindowFlags windowFlags =
+        (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_ALLOW_HIGHDPI);
+
 #ifdef __EMSCRIPTEN__
-    auto _result = emscripten_set_canvas_element_size("canvas", width, height);
+#else
+    windowFlags = (SDL_WindowFlags)(windowFlags | SDL_WINDOW_RESIZABLE);
+#endif
+
+    _window = SDL_CreateWindow(
+        title, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        width * device_pixel_ratio, height * device_pixel_ratio, windowFlags);
+    _context = SDL_GL_CreateContext(_window);
+
+#ifdef __EMSCRIPTEN__
+    // auto _result = emscripten_set_canvas_element_size("canvas", width,
+    // height);
 #endif
   }
-  ~SafeGlfwWindow() { glfwDestroyWindow(_window); }
+  ~SafeSDLWindow() { SDL_DestroyWindow(_window); }
 
-  GLFWwindow *window() const { return _window; }
-  void makeContextCurrent() const { glfwMakeContextCurrent(_window); };
+  SDL_Window *window() const { return _window; }
+  SDL_GLContext context() const { return _context; }
+  void makeContextCurrent() const { SDL_GL_MakeCurrent(_window, _context); };
 
 private:
-  GLFWwindow *_window;
-};
-
-class SafeGlew : NoCopy {
-public:
-  SafeGlew() {
-    glewExperimental = GL_TRUE;
-    glewInit();
-
-    if (glGenBuffers == nullptr) {
-      throw std::runtime_error("glewInit() failed: glGenBuffers == nullptr");
-    }
-  }
+  SDL_Window *_window;
+  SDL_GLContext _context;
 };
 
 class SafeImGui : NoCopy {
 public:
-  SafeImGui(GLFWwindow *window) {
+  SafeImGui(SDL_Window *window, SDL_GLContext context) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init();
+    // ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplSDL2_InitForOpenGL(window, context);
+    ImGui_ImplOpenGL3_Init("#version 100");
     ImPlot::CreateContext();
     ImGui::StyleColorsDark();
   }
   ~SafeImGui() {
     ImPlot::DestroyContext();
     ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
+    // ImGui_ImplGlfw_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
   }
 };
@@ -111,6 +123,19 @@ public:
 
 private:
   GLuint _vbo;
+};
+
+class SafeGlew : NoCopy {
+public:
+  SafeGlew() {
+    glewExperimental = GL_TRUE;
+    glewInit();
+
+    if (glGenBuffers == nullptr) {
+      std::cerr << "glewInit() failed: glGenBuffers == nullptr" << std::endl;
+      std::abort();
+    }
+  }
 };
 
 class SafeVAO : NoCopy {
@@ -172,39 +197,56 @@ protected:
   SafeShaderProgram _program;
 };
 
-class GlfwFrame : NoCopy {
+class SDLFrame : NoCopy {
 public:
-  GlfwFrame(GLFWwindow *window) : window(window) {
-    glfwGetFramebufferSize(window, &_width, &_height);
+  SDLFrame(SDL_Window *window) : _shouldClose(false), window(window) {
+
+    SDL_Event event;
+    while (SDL_PollEvent(&event)) {
+      ImGui_ImplSDL2_ProcessEvent(&event);
+
+      if (event.type == SDL_WINDOWEVENT &&
+          event.window.event == SDL_WINDOWEVENT_CLOSE &&
+          event.window.windowID == SDL_GetWindowID(window))
+        _shouldClose = true;
+    };
+
+    SDL_GL_GetDrawableSize(window, &_width, &_height);
 
     glClearColor(.45f, .55f, .6f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-      glfwSetWindowShouldClose(window, GL_TRUE);
+    int numKeys = 0;
+    const uint8_t *keyboard = SDL_GetKeyboardState(&numKeys);
+
+    if (keyboard[SDL_SCANCODE_ESCAPE]) {
+      _shouldClose = true;
     }
   }
-  ~GlfwFrame() {
-    int dispWidth, dispHeight;
-    glfwGetFramebufferSize(window, &dispWidth, &dispHeight);
-    glViewport(0, 0, dispWidth, dispHeight);
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+  ~SDLFrame() {
+    SDL_GL_GetDrawableSize(window, &_width, &_height);
+    glViewport(0, 0, _width, _height);
+    SDL_GL_SwapWindow(window);
   }
 
   int width() const { return _width; }
   int height() const { return _height; }
 
+  bool shouldClose() const { return _shouldClose; }
+
 private:
-  GLFWwindow *window;
+  bool _shouldClose;
+  SDL_Window *window;
   int _width, _height;
 };
 
-class ImGuiGlfwFrame : NoCopy {
+class ImGuiSDLFrame : NoCopy {
+  const SafeSDLWindow &_window;
+
 public:
-  ImGuiGlfwFrame() {
+  explicit ImGuiSDLFrame(const SafeSDLWindow &window) : _window(window) {
     ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
 
 
     /* Fix negative DeltaTime in firefox */
@@ -212,8 +254,9 @@ public:
     io.DeltaTime = std::max(1e-9f, io.DeltaTime);
     ImGui::NewFrame();
   }
-  ~ImGuiGlfwFrame() {
+  ~ImGuiSDLFrame() {
     ImGui::Render();
+    _window.makeContextCurrent();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   }
 };
@@ -304,7 +347,7 @@ public:
     if (channels != 1 && channels != 3 && channels != 4) {
       std::cerr << "[E] texture cannot have " << channels << " channels"
                 << std::endl;
-      throw std::invalid_argument("invalid number of channels");
+      std::abort();
     }
     const auto mode = modes[channels];
 

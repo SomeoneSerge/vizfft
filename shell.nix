@@ -13,7 +13,8 @@ mkShell {
     cmake
     pkg-config
     ninja
-    glfw3
+    # glfw3
+    SDL2
     glew.dev
     libglvnd.dev
     eigen

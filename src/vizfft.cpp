@@ -5,8 +5,8 @@
 #define GL_GLEXT_PROTOTYPES
 #define EGL_EGLEXT_PROTOTYPES
 
-#define GLFW_INCLUDE_ES3
-#include <GLES3/gl3.h>
+// #define GLFW_INCLUDE_ES3
+// #include <GLES3/gl3.h>
 #endif
 
 #include "implot.h"
@@ -103,13 +103,14 @@ struct Heatmap {
 constexpr auto nyquist = 128;
 
 struct App {
-  SafeGlfwCtx &glfwCtx;
-  SafeGlfwWindow &glfwWindow;
-  SafeGlew &glew;
+  SafeSDLSession &initSDL;
+  SafeSDLWindow &sdlWindow;
   SafeImGui &imguiContext;
   SafeGlTexture tex0, texAbs, texArg;
   Heatmap heatAbs, heatArg;
   ImEditVec2 editCoeffs;
+
+  bool shouldClose = false;
 
   State prev = {.mulWindow = false,
                 .coef_a = std::numeric_limits<float>::quiet_NaN(),
@@ -121,8 +122,10 @@ struct App {
 
 void App::frame() {
 
-  GlfwFrame glfwFrame(glfwWindow.window());
-  ImGuiGlfwFrame imguiFrame;
+  SDLFrame sdlFrame(sdlWindow.window());
+  ImGuiSDLFrame imguiFrame(sdlWindow);
+
+  shouldClose |= sdlFrame.shouldClose();
 
   ImVec2 srcWindowSize = {500.0f, 640.0f};
   ImGui::SetNextWindowSize(srcWindowSize, ImGuiCond_Once);
@@ -216,19 +219,20 @@ std::function<void()> frame_global;
 void call_frame_global() { frame_global(); }
 
 int main(int argc, char *argv[]) {
-  SafeGlfwCtx glfwCtx;
-  SafeGlfwWindow glfwWindow;
-  glfwWindow.makeContextCurrent();
+  SafeSDLSession sdlSession;
+  SafeSDLWindow sdlWindow;
+  sdlWindow.makeContextCurrent();
 
-  SafeGlew glew;
-  SafeImGui imguiContext(glfwWindow.window());
+  // It would seem it's not neccessary to glewInit() after all o_0
+  // SafeGlew glewCtx;
+
+  SafeImGui imguiContext(sdlWindow.window(), sdlWindow.context());
 
   std::cout << "glGetString(GL_VERSION): " << glGetString(GL_VERSION)
             << std::endl;
 
-  App app = {.glfwCtx = glfwCtx,
-             .glfwWindow = glfwWindow,
-             .glew = glew,
+  App app = {.initSDL = sdlSession,
+             .sdlWindow = sdlWindow,
              .imguiContext = imguiContext,
              .editCoeffs = ImEditVec2("coeffs", ImVec2(-nyquist, nyquist),
                                       ImVec2(-nyquist, nyquist))};
@@ -237,7 +241,7 @@ int main(int argc, char *argv[]) {
   frame_global = [&]() { app.frame(); };
   emscripten_set_main_loop(call_frame_global, 0, true);
 #else
-  while (!glfwWindowShouldClose(glfwWindow.window())) {
+  while (!app.shouldClose) {
     app.frame();
   }
 #endif

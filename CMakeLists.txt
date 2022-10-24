@@ -15,7 +15,8 @@ add_library(
   external/imgui/imgui_draw.cpp
   external/imgui/imgui_tables.cpp
   external/imgui/imgui_widgets.cpp
-  external/imgui/backends/imgui_impl_glfw.cpp
+  # external/imgui/backends/imgui_impl_glfw.cpp
+  external/imgui/backends/imgui_impl_sdl.cpp
   external/imgui/backends/imgui_impl_opengl3.cpp
   external/implot/implot.cpp
   external/implot/implot_demo.cpp
@@ -46,18 +47,22 @@ if(BUILD_EMSCRIPTEN)
 
   set_target_properties(
     ${PROJECT_NAME} PROPERTIES LINK_FLAGS
-    "-s USE_GLFW=3 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 --shell-file ${PROJECT_SOURCE_DIR}/shell.html"
+    "-fexceptions -s USE_SDL=2 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 --shell-file ${PROJECT_SOURCE_DIR}/shell.html"
   )
+  target_compile_options(imgui PUBLIC -s USE_SDL=2 -fexceptions)
 else()
   find_package(GLEW REQUIRED)
-  find_package(glfw3 REQUIRED)
+  find_package(SDL2 REQUIRED)
   find_package(OpenGL REQUIRED)
+
+  # I guess I don't want to target_link_libraries imgui with SDL2, do I?
+  target_include_directories(imgui PUBLIC ${SDL2_INCLUDE_DIRS})
 
   target_link_libraries(
     vizfft
     
     GLEW
-    glfw
+    SDL2::SDL2
     OpenGL::GL
   )
 endif()
