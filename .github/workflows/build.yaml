@@ -18,7 +18,7 @@ jobs:
         with:
           # Pin just something so nix-shell doesn't give warnings
           nix_path: "nixpkgs=https://github.com/nixos/nixpkgs/archive/7f9b6e2babf232412682c09e57ed666d8f84ac2d.tar.gz"
-          install_url: https://releases.nixos.org/nix/nix-2.5.1/install
+          install_url: https://releases.nixos.org/nix/nix-2.13.2/install
           extra_nix_config: |
             experimental-features = nix-command flakes
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
