@@ -47,9 +47,12 @@ if(BUILD_EMSCRIPTEN)
 
   set_target_properties(
     ${PROJECT_NAME} PROPERTIES LINK_FLAGS
-    "-fexceptions -s USE_SDL=2 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 --shell-file ${PROJECT_SOURCE_DIR}/shell.html"
+    "-s USE_SDL=2 -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 --shell-file ${PROJECT_SOURCE_DIR}/shell.html"
   )
-  target_compile_options(imgui PUBLIC -s USE_SDL=2 -fexceptions)
+
+  # USE_SDL linker option is not enough: compiler needs an option too,
+  # otherwise imgui SDL backend won't find SDL.h
+  target_compile_options(imgui PUBLIC -s USE_SDL=2)
 else()
   find_package(GLEW REQUIRED)
   find_package(SDL2 REQUIRED)
