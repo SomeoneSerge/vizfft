@@ -13,12 +13,14 @@ mkShell {
     cmake
     pkg-config
     ninja
+    rsync
+  ];
+  buildInputs = [
     # glfw3
-    SDL2
+    SDL2.dev
     glew.dev
     libglvnd.dev
     eigen
-    rsync
   ];
   EM_CACHE = "${builtins.unsafeDiscardStringContext (builtins.toString ./.)}/.em_cache";
   EM_PREBUILT_CACHE = "${emscripten}/share/emscripten/cache/";
